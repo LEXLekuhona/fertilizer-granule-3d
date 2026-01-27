@@ -1,0 +1,153 @@
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+/* Подключение шрифта RF Dewi (если есть локальные файлы) */
+@font-face {
+  font-family: 'RF Dewi';
+  src: url('/fonts/RFDewi-Semibold.woff2') format('woff2'),
+       url('/fonts/RFDewi-Semibold.woff') format('woff');
+  font-weight: 600;
+  font-style: normal;
+  font-display: swap;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
+    sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+#root {
+  width: 100%;
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: #fff;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateX(-50%) translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+}
+
+@keyframes fadeInOnly {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* Плавное появление и исчезновение для описаний */
+.fade-enter {
+  opacity: 0;
+  transform: translateX(-50%) translateY(-10px);
+}
+
+.fade-enter-active {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+  transition: opacity 0.3s ease, transform 0.3s ease;
+}
+
+.fade-exit {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}
+
+.fade-exit-active {
+  opacity: 0;
+  transform: translateX(-50%) translateY(-10px);
+  transition: opacity 0.3s ease, transform 0.3s ease;
+}
+
+/* Стили для заголовка "Все питание в одной грануле" */
+.main-title {
+  font-family: 'RF Dewi', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-weight: 600;
+  font-style: normal;
+  font-size: 48px;
+  line-height: 56px;
+  letter-spacing: 0%;
+  /* leading-trim - экспериментальное свойство, поддерживается не везде */
+  leading-trim: CAP_HEIGHT;
+  -webkit-leading-trim: CAP_HEIGHT;
+}
+
+/* Стили для подзаголовка */
+.subtitle {
+  font-family: 'RF Dewi', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-weight: 600;
+  font-style: normal;
+  font-size: 18px;
+  line-height: 140%;
+  letter-spacing: 0%;
+  /* leading-trim - экспериментальное свойство, поддерживается не везде */
+  leading-trim: CAP_HEIGHT;
+  -webkit-leading-trim: CAP_HEIGHT;
+}
+
+/* Анимация fadeIn для центральной формулы */
+@keyframes fadeInScale {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.8);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1);
+  }
+}
+
+.formula-overlay {
+  animation: fadeInScale 0.3s ease-out;
+}
+
+@keyframes fadeInScale {
+  from {
+    opacity: 0;
+    transform: scale(0.8);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+/* Стили для надписей питательных веществ */
+.nutrient-label {
+  font-family: 'RF Dewi', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-weight: 600;
+  font-style: normal;
+  font-size: 26px;
+  line-height: 130%;
+  letter-spacing: 0%;
+  leading-trim: CAP_HEIGHT;
+  -webkit-leading-trim: CAP_HEIGHT;
+}
+
+/* Стили для описания питательных веществ */
+.nutrient-description {
+  font-family: 'RF Dewi', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-weight: 600;
+  font-style: normal;
+  font-size: 14px;
+  line-height: 140%;
+  letter-spacing: 0%;
+  leading-trim: CAP_HEIGHT;
+  -webkit-leading-trim: CAP_HEIGHT;
+  color: rgba(47, 47, 47, 1);
+}
