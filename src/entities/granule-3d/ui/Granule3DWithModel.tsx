@@ -104,79 +104,22 @@ export const Granule3DWithModel = ({
       // Детальная проверка всех текстур в материалах из GLB
       // ВАЖНО: Проверяем наличие основной текстуры map (Albedo), а не просто любых текстур
       let hasAlbedoTexture = false
-      const foundTextures: string[] = []
-      
-      console.log('🔍 Проверяем GLB файл на наличие текстур...')
       
       scene.traverse((child) => {
         if (child instanceof Mesh && child.material) {
           const material = child.material as MeshStandardMaterial
           
-          // Проверяем все возможные типы текстур
-          const textures: Record<string, any> = {
-            'map (Albedo)': material.map,
-            'normalMap': material.normalMap,
-            'roughnessMap': material.roughnessMap,
-            'metalnessMap': material.metalnessMap,
-            'aoMap': material.aoMap,
-            'emissiveMap': material.emissiveMap,
-            'bumpMap': material.bumpMap,
-            'displacementMap': material.displacementMap,
-            'alphaMap': material.alphaMap,
-            'envMap': material.envMap
-          }
-          
-          // Проверяем каждую текстуру
-          Object.entries(textures).forEach(([name, texture]) => {
-            if (texture) {
-              const textureInfo = texture.image 
-                ? `${name}: ${texture.image.src || texture.image.data || 'встроенная'} (${texture.image.width}x${texture.image.height})`
-                : `${name}: встроенная (${texture.image?.width || '?'}x${texture.image?.height || '?'})`
-              foundTextures.push(textureInfo)
-              
-              // Проверяем, есть ли основная текстура Albedo (map) с нормальным размером
-              if (name === 'map (Albedo)' && texture.image && texture.image.width > 1 && texture.image.height > 1) {
-                hasAlbedoTexture = true
-                console.log(`  ✅ Найдена основная текстура: ${textureInfo}`)
-              } else if (name === 'map (Albedo)') {
-                console.log(`  ⚠️ Найдена текстура Albedo, но она слишком маленькая или отсутствует: ${textureInfo}`)
-              } else {
-                console.log(`  ✅ Найдена текстура: ${textureInfo}`)
-              }
-            }
-          })
-          
-          // Также проверяем цвет материала
-          if (material.color) {
-            const color = material.color
-            const isNotGray = Math.abs(color.r - color.g) > 0.01 || Math.abs(color.g - color.b) > 0.01
-            if (isNotGray) {
-              console.log(`  🎨 Материал "${material.name || 'unnamed'}" имеет цвет:`, {
-                r: color.r.toFixed(3),
-                g: color.g.toFixed(3),
-                b: color.b.toFixed(3),
-                hex: `#${Math.round(color.r * 255).toString(16).padStart(2, '0')}${Math.round(color.g * 255).toString(16).padStart(2, '0')}${Math.round(color.b * 255).toString(16).padStart(2, '0')}`
-              })
-            }
+          // Проверяем, есть ли основная текстура Albedo (map) с нормальным размером
+          if (material.map && material.map.image && material.map.image.width > 1 && material.map.image.height > 1) {
+            hasAlbedoTexture = true
           }
         }
       })
       
-      if (foundTextures.length > 0) {
-        console.log(`📦 В GLB файле найдено ${foundTextures.length} текстур:`, foundTextures)
-      } else {
-        console.log('⚠️ В GLB файле НЕ найдено текстур')
-      }
-      
       // Если основной текстуры Albedo нет или она слишком маленькая, загружаем текстуры из папки textures/
       if (!hasAlbedoTexture) {
-        console.log('⚠️ Основная текстура Albedo не найдена в GLB или слишком маленькая, загружаем из папки textures/')
-        console.log('🔍 Основная текстура Albedo не найдена в GLB, загружаем из папки textures/')
-        
         const loadTextures = async () => {
           try {
-            console.log('📦 Начинаем загрузку текстур...')
-            
             // Загружаем все текстуры
             // ВАЖНО:
             // - BaseColor_BAKED.png — запечённый результат ColorRamp(Albedo) из Blender (sRGB)
@@ -184,38 +127,18 @@ export const Granule3DWithModel = ({
             const baseColorTexture = await loader.loadAsync('/models/textures/BaseColor_BAKED.png')
             baseColorTexture.colorSpace = SRGBColorSpace // sRGB для цветовой текстуры
             baseColorTexture.flipY = false // Blender использует другую ориентацию Y
-            console.log('✅ Загружена текстура: BaseColor_BAKED.png (запечённый BaseColor)', {
-              размер: `${baseColorTexture.image.width}x${baseColorTexture.image.height}`,
-              путь: '/models/textures/BaseColor_BAKED.png',
-              colorSpace: 'sRGB'
-            })
             
             const normalTexture = await loader.loadAsync('/models/textures/Normal.png')
             // Normal map должна быть в Linear (не sRGB)
             normalTexture.flipY = false
-            console.log('✅ Загружена текстура: Normal.png (карта нормалей)', {
-              размер: `${normalTexture.image.width}x${normalTexture.image.height}`,
-              путь: '/models/textures/Normal.png',
-              colorSpace: 'Linear'
-            })
             
             const roughnessTexture = await loader.loadAsync('/models/textures/Roughness.png')
             // Roughness map должна быть в Linear (не sRGB)
             roughnessTexture.flipY = false
-            console.log('✅ Загружена текстура: Roughness.png (шероховатость)', {
-              размер: `${roughnessTexture.image.width}x${roughnessTexture.image.height}`,
-              путь: '/models/textures/Roughness.png',
-              colorSpace: 'Linear'
-            })
             
             const occlusionTexture = await loader.loadAsync('/models/textures/Occlusion.png')
             // Occlusion map должна быть в Linear (не sRGB)
             occlusionTexture.flipY = false
-            console.log('✅ Загружена текстура: Occlusion.png (ambient occlusion)', {
-              размер: `${occlusionTexture.image.width}x${occlusionTexture.image.height}`,
-              путь: '/models/textures/Occlusion.png',
-              colorSpace: 'Linear'
-            })
             
             // Применяем текстуры ко всем материалам в сцене
             let materialsCount = 0
@@ -234,15 +157,6 @@ export const Granule3DWithModel = ({
               // Настраиваем параметры материала для лучшего отображения
               material.needsUpdate = true
               materialsCount++
-              
-              console.log(`🎨 Текстуры применены к материалу "${material.name || 'unnamed'}"`, {
-                albedo: 'BaseColor_BAKED.png',
-                normal: 'Normal.png',
-                roughness: 'Roughness.png',
-                occlusion: 'Occlusion.png',
-                hasMap: !!material.map,
-                hasNormalMap: !!material.normalMap
-              })
             }
             
             scene.traverse((child) => {
@@ -262,76 +176,35 @@ export const Granule3DWithModel = ({
               }
             })
             
-            console.log('✨ Все текстуры успешно загружены и применены!', {
-              всего_материалов: materialsCount,
-              применённые_текстуры: [
-                'BaseColor_BAKED.png (запечённый BaseColor)',
-                'Normal.png (карта нормалей)',
-                'Roughness.png (шероховатость)',
-                'Occlusion.png (ambient occlusion)'
-              ]
-            })
-            
             // Принудительно обновляем рендерер
             gl.state.reset()
-            
-            // Проверяем, что текстуры действительно применены
-            scene.traverse((child) => {
-              if (child instanceof Mesh) {
-                const material = Array.isArray(child.material) 
-                  ? child.material[0] 
-                  : child.material
-                
-                if (material instanceof MeshStandardMaterial) {
-                  console.log(`✅ Проверка материала "${material.name || 'unnamed'}":`, {
-                    hasMap: !!material.map,
-                    mapSize: material.map ? `${material.map.image.width}x${material.map.image.height}` : 'нет',
-                    hasNormalMap: !!material.normalMap,
-                    hasRoughnessMap: !!material.roughnessMap,
-                    hasAoMap: !!material.aoMap
-                  })
-                }
-              }
-            })
           } catch (error) {
-            console.error('❌ Ошибка загрузки текстур:', error)
+            // Ошибка загрузки текстур - модель будет использовать материалы из GLB
           }
         }
         
         loadTextures()
       } else {
         // Если текстуры есть в GLB, просто настраиваем colorSpace
-        console.log('🔍 Текстуры найдены в GLB, настраиваем colorSpace')
-        
         scene.traverse((child) => {
           if (child instanceof Mesh && child.material) {
             const material = child.material as MeshStandardMaterial
             
-            const appliedTextures: string[] = []
-            
             // Настраиваем правильный colorSpace для текстур
             if (material.map) {
               material.map.colorSpace = SRGBColorSpace
-              appliedTextures.push(`map: ${material.map.image?.src || 'встроенная'}`)
             }
             if (material.normalMap) {
               material.normalMap.colorSpace = SRGBColorSpace
-              appliedTextures.push(`normalMap: ${material.normalMap.image?.src || 'встроенная'}`)
             }
             if (material.roughnessMap) {
               material.roughnessMap.colorSpace = SRGBColorSpace
-              appliedTextures.push(`roughnessMap: ${material.roughnessMap.image?.src || 'встроенная'}`)
             }
             if (material.aoMap) {
               material.aoMap.colorSpace = SRGBColorSpace
-              appliedTextures.push(`aoMap: ${material.aoMap.image?.src || 'встроенная'}`)
             }
             
             material.needsUpdate = true
-            
-            if (appliedTextures.length > 0) {
-              console.log(`🎨 Материал "${material.name || 'unnamed'}" имеет текстуры из GLB:`, appliedTextures)
-            }
           }
         })
       }
