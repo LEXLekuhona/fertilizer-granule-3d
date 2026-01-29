@@ -45,7 +45,9 @@ interface Granule3DWithModelProps {
  * Загружает модель заранее, чтобы избежать задержек при первом рендере.
  * Вызывается на уровне модуля, выполняется один раз при загрузке модуля.
  */
-useGLTF.preload('/models/granule-organic.glb')
+// Используем BASE_URL для правильных путей в dev и production
+const MODELS_BASE = import.meta.env.BASE_URL + 'models/'
+useGLTF.preload(`${MODELS_BASE}granule-organic.glb`)
 
 /**
  * Компонент для отображения 3D модели гранулы удобрения
@@ -124,19 +126,20 @@ export const Granule3DWithModel = ({
             // ВАЖНО:
             // - BaseColor_BAKED.png — запечённый результат ColorRamp(Albedo) из Blender (sRGB)
             // - Normal/Roughness/Occlusion — карты данных (Linear)
-            const baseColorTexture = await loader.loadAsync('/models/textures/BaseColor_BAKED.png')
+            const texturesBase = MODELS_BASE + 'textures/'
+            const baseColorTexture = await loader.loadAsync(`${texturesBase}BaseColor_BAKED.png`)
             baseColorTexture.colorSpace = SRGBColorSpace // sRGB для цветовой текстуры
             baseColorTexture.flipY = false // Blender использует другую ориентацию Y
             
-            const normalTexture = await loader.loadAsync('/models/textures/Normal.png')
+            const normalTexture = await loader.loadAsync(`${texturesBase}Normal.png`)
             // Normal map должна быть в Linear (не sRGB)
             normalTexture.flipY = false
             
-            const roughnessTexture = await loader.loadAsync('/models/textures/Roughness.png')
+            const roughnessTexture = await loader.loadAsync(`${texturesBase}Roughness.png`)
             // Roughness map должна быть в Linear (не sRGB)
             roughnessTexture.flipY = false
             
-            const occlusionTexture = await loader.loadAsync('/models/textures/Occlusion.png')
+            const occlusionTexture = await loader.loadAsync(`${texturesBase}Occlusion.png`)
             // Occlusion map должна быть в Linear (не sRGB)
             occlusionTexture.flipY = false
             

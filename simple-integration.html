@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Простой пример встраивания</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+        }
+        
+        .my-content {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+        
+        /* Контейнер для React приложения */
+        #my-fertilizer-app {
+            margin: 40px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="my-content">
+        <h1>Мой существующий сайт</h1>
+        <p>Обычный HTML контент...</p>
+        
+        <!-- Контейнер для встроенного приложения -->
+        <div id="my-fertilizer-app"></div>
+        
+        <p>Ещё контент после приложения...</p>
+    </div>
+
+    <!-- 
+        ВАЖНО: После сборки (npm run build) скопируйте файлы из dist/ на ваш сервер
+        и обновите пути ниже на реальные пути к файлам.
+        
+        Пример структуры после сборки:
+        dist/
+          index.html
+          assets/
+            index.abc123.js
+            index.def456.css
+    -->
+    
+    <!-- Подключаем CSS -->
+    <link rel="stylesheet" href="./dist/assets/index.[HASH].css">
+    
+    <!-- Подключаем JS и инициализируем -->
+    <script type="module">
+        // Импортируем функцию инициализации
+        // ВАЖНО: Замените [HASH] на реальный hash из имени файла после сборки
+        import { initFertilizerGranule } from './dist/assets/index.[HASH].js';
+        
+        // Инициализируем приложение в контейнере
+        initFertilizerGranule('my-fertilizer-app');
+    </script>
+</body>
+</html>

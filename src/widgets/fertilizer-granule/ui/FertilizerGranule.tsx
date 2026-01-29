@@ -155,7 +155,7 @@ export const FertilizerGranule = React.memo(() => {
             <Suspense fallback={null}>
               <Granule3DWithModel 
                 hoverRotation={hoveredNutrient ? (HOVER_ROTATION_ANGLE * Math.PI) / 180 : 0}
-                modelPath="/models/granule-organic.glb"
+                modelPath={`${import.meta.env.BASE_URL}models/granule-organic.glb`}
                 initialPosition={[0, 0, 0]}
                 initialRotation={[-Math.PI / 2, Math.PI, 0]}
                 initialScale={1}

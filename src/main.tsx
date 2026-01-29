@@ -3,8 +3,34 @@ import ReactDOM from 'react-dom/client'
 import App from './app/App'
 import './app/index.css'
 
-ReactDOM.createRoot(document.getElementById('root')!).render(
-  <React.StrictMode>
-    <App />
-  </React.StrictMode>,
-)
+/**
+ * Функция для инициализации приложения в указанном контейнере
+ * Используется для встраивания в существующий HTML сайт
+ * 
+ * @param containerId - ID элемента, в который будет встроено приложение (по умолчанию 'root')
+ */
+export function initFertilizerGranule(containerId: string = 'root') {
+  const container = document.getElementById(containerId)
+  
+  if (!container) {
+    // Элемент не найден - создаём его автоматически
+    const newContainer = document.createElement('div')
+    newContainer.id = containerId
+    document.body.appendChild(newContainer)
+    return initFertilizerGranule(containerId)
+  }
+
+  const root = ReactDOM.createRoot(container)
+  root.render(
+    <React.StrictMode>
+      <App />
+    </React.StrictMode>
+  )
+
+  return root
+}
+
+// Автоматическая инициализация, если есть элемент с id="root" (для dev режима)
+if (document.getElementById('root')) {
+  initFertilizerGranule('root')
+}

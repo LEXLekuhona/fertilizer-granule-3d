@@ -117,3 +117,35 @@ newElement: {
 - **@react-three/drei** - Полезные утилиты для R3F
 - **Vite** - Сборщик и dev-сервер
 - **Bootstrap** - CSS фреймворк (используется минимально)
+
+## 🌐 Встраивание в существующий HTML сайт
+
+Проект можно встроить в существующий сайт на чистом HTML/CSS/JS двумя способами:
+
+### Вариант 1: Iframe (рекомендуется для начала)
+
+```html
+<iframe 
+    src="/fertilizer-granule/index.html" 
+    width="1392" 
+    height="700"
+    frameborder="0">
+</iframe>
+```
+
+### Вариант 2: Прямое встраивание
+
+```html
+<div id="my-fertilizer-app"></div>
+<script type="module">
+    import { initFertilizerGranule } from '/fertilizer-granule/assets/index.[hash].js';
+    initFertilizerGranule('my-fertilizer-app');
+</script>
+```
+
+**📖 Подробная инструкция:** [`INTEGRATION_SIMPLE.md`](./INTEGRATION_SIMPLE.md)
+
+**Шаги:**
+1. Выполните `npm run build`
+2. Скопируйте `dist/` и `public/models/` на ваш сервер
+3. Встройте в ваш HTML (см. примеры выше)

@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Пример встраивания 3D Гранулы</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        
+        h1 {
+            color: #333;
+            margin-bottom: 20px;
+        }
+        
+        /* Контейнер для встроенного приложения */
+        #fertilizer-granule-container {
+            width: 100%;
+            min-height: 700px;
+            margin: 20px 0;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            overflow: hidden;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Мой существующий сайт</h1>
+        
+        <p>Это обычный HTML контент вашего сайта.</p>
+        
+        <!-- Контейнер для встроенного React приложения -->
+        <div id="fertilizer-granule-container"></div>
+        
+        <p>Ещё один блок контента после приложения.</p>
+    </div>
+
+    <!-- Подключаем собранные файлы из dist/ -->
+    <!-- ВАЖНО: Замените пути на актуальные после сборки -->
+    <script type="module">
+        // Импортируем функцию инициализации из собранного bundle
+        import { initFertilizerGranule } from './dist/assets/index.[hash].js';
+        
+        // Инициализируем приложение в контейнере
+        initFertilizerGranule('fertilizer-granule-container');
+    </script>
+    
+    <!-- Альтернативный способ: если используете обычный script (не module) -->
+    <!--
+    <link rel="stylesheet" href="./dist/assets/index.[hash].css">
+    <script src="./dist/assets/index.[hash].js"></script>
+    <script>
+        // После загрузки скрипта функция будет доступна глобально
+        window.initFertilizerGranule('fertilizer-granule-container');
+    </script>
+    -->
+</body>
+</html>
