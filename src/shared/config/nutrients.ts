@@ -1,15 +1,34 @@
+/**
+ * Интерфейс для описания питательного элемента
+ * 
+ * Используется для хранения базовой информации о каждом элементе питания:
+ * - id: уникальный идентификатор (используется как ключ в конфигурациях)
+ * - name: название элемента на русском языке
+ * - formula: химическая формула (может содержать Unicode символы для индексов)
+ * - description: описание действия элемента на растения
+ * - position: позиция для углового позиционирования (используется как fallback)
+ */
 export interface Nutrient {
   id: string
   name: string
   formula: string
   description: string
   position: {
-    angle: number // угол в градусах для позиционирования
+    angle: number // угол в градусах для позиционирования (используется как fallback)
     x: number
     y: number
   }
 }
 
+/**
+ * Массив всех питательных элементов, отображаемых на странице
+ * 
+ * ВАЖНО: При добавлении нового элемента необходимо также:
+ * 1. Добавить конфигурацию в NUTRIENT_CONFIGS (nutrient-configs.ts)
+ * 2. Добавить SVG путь линии в NUTRIENT_LINE_PATHS (nutrient-lines.ts)
+ * 3. Добавить SVG формулу в NUTRIENT_FORMULA_SVGS (nutrient-formulas.tsx)
+ * 4. Добавить флаг isLeft в NutrientSections (nutrientIsLeft map)
+ */
 export const NUTRIENTS: Nutrient[] = [
   {
     id: 'nitrogen',
@@ -55,5 +74,10 @@ export const NUTRIENTS: Nutrient[] = [
   }
 ]
 
-// Настройка поворота при ховере (в градусах)
+/**
+ * Угол поворота 3D модели при наведении на элемент питания
+ * 
+ * Значение в градусах. При наведении на элемент модель поворачивается
+ * горизонтально на указанный угол для лучшей визуализации.
+ */
 export const HOVER_ROTATION_ANGLE = 5

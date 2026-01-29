@@ -1,1 +1,1 @@
-export { Granule3D } from './ui/Granule3D'
+export { Granule3DWithModel } from './ui/Granule3DWithModel'

@@ -5,6 +5,14 @@
 }
 
 /* Подключение шрифта RF Dewi (если есть локальные файлы) */
+/* 
+ * ВАЖНО: Если шрифты отсутствуют, приложение будет использовать системные шрифты.
+ * Чтобы использовать кастомный шрифт, поместите файлы RFDewi-Semibold.woff2 и RFDewi-Semibold.woff
+ * в папку public/fonts/
+ * 
+ * Если файлы отсутствуют, закомментируйте блок @font-face ниже.
+ */
+/* 
 @font-face {
   font-family: 'RF Dewi';
   src: url('/fonts/RFDewi-Semibold.woff2') format('woff2'),
@@ -13,6 +21,7 @@
   font-style: normal;
   font-display: swap;
 }
+*/
 
 body {
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',

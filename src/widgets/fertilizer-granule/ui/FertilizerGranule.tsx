@@ -1,17 +1,72 @@
 import { Granule3DWithModel } from '@/entities/granule-3d/ui/Granule3DWithModel'
 import { NutrientSections } from '@/features/nutrient-sections'
+import { NutrientDescription } from '@/features/nutrient-sections/ui/nutrients/NutrientDescription'
+import { NutrientFormula } from '@/features/nutrient-sections/ui/nutrients/NutrientFormula'
+import { NUTRIENT_CONFIGS } from '@/shared/config/nutrient-configs'
+import { NUTRIENT_FORMULA_SVGS } from '@/shared/config/nutrient-formulas'
 import { HOVER_ROTATION_ANGLE, NUTRIENTS } from '@/shared/config/nutrients'
 import { OrbitControls, PerspectiveCamera } from '@react-three/drei'
 import { Canvas } from '@react-three/fiber'
 import 'bootstrap/dist/css/bootstrap.min.css'
-import { Suspense, useState } from 'react'
+import React, { Suspense, useCallback, useMemo, useState } from 'react'
 
-export const FertilizerGranule = () => {
+/**
+ * Главный виджет приложения - интерактивная 3D модель гранулы удобрения
+ * 
+ * СТРУКТУРА:
+ * 1. Заголовок и подзаголовок
+ * 2. Контейнер с 3D моделью и элементами питания:
+ *    - Canvas с 3D моделью (Three.js)
+ *    - NutrientSections - надписи и линии элементов
+ *    - NutrientDescription - описание при наведении
+ *    - NutrientFormula - формула на 3D модели при наведении
+ * 
+ * ИНТЕРАКТИВНОСТЬ:
+ * - При наведении на элемент питания:
+ *   1. 3D модель поворачивается на HOVER_ROTATION_ANGLE градусов
+ *   2. Появляется описание под линией
+ *   3. Появляется формула на 3D модели
+ * 
+ * ОПТИМИЗАЦИЯ:
+ * - React.memo предотвращает лишние перерисовки
+ * - useMemo для вычисления угла поворота и данных элемента
+ * - useCallback для обработчика наведения мыши
+ * - Suspense для асинхронной загрузки 3D модели
+ */
+export const FertilizerGranule = React.memo(() => {
+  // Состояние текущего элемента под курсором
   const [hoveredNutrient, setHoveredNutrient] = useState<string | null>(null)
 
-  const handleNutrientHover = (nutrientId: string | null) => {
+  // Мемоизированный обработчик наведения мыши
+  const handleNutrientHover = useCallback((nutrientId: string | null) => {
     setHoveredNutrient(nutrientId)
-  }
+  }, [])
+
+  /**
+   * Вычисляет угол поворота 3D модели в радианах
+   *
+   * Поворачивается только при наведении на элемент питания.
+   * Конвертирует градусы в радианы для Three.js.
+   */
+  // rotationAngle не используем напрямую — угол поворота передаём прямо в props модели ниже
+
+  /**
+   * Данные текущего элемента под курсором
+   * Используется для отображения описания
+   */
+  const hoveredNutrientData = useMemo(() => {
+    if (!hoveredNutrient) return null
+    return NUTRIENTS.find(n => n.id === hoveredNutrient)
+  }, [hoveredNutrient])
+
+  /**
+   * Конфигурация текущего элемента под курсором
+   * Используется для позиционирования описания и формулы
+   */
+  const hoveredNutrientConfig = useMemo(() => {
+    if (!hoveredNutrient) return null
+    return NUTRIENT_CONFIGS[hoveredNutrient]
+  }, [hoveredNutrient])
 
   return (
     <div style={{ 
@@ -70,24 +125,50 @@ export const FertilizerGranule = () => {
           opacity: 1,
           transform: 'rotate(0deg)'
         }}>
-          <Canvas>
+          <Canvas
+            gl={{
+              // Настройки для правильного отображения цветов как в Blender
+              outputColorSpace: 'srgb' // Используем sRGB для соответствия Blender
+            }}
+            onCreated={({ gl }) => {
+              /**
+               * Blender Color Management:
+               * - View Transform: AgX
+               * - Exposure: 0.0
+               * - Gamma: 1.0
+               *
+               * В Three.js нет AgX "из коробки", поэтому используем ближайшее (ACESFilmic)
+               * и держим экспозицию на нейтрали, чтобы не "пережигать" цвет.
+               */
+              gl.toneMapping = 1 // ACESFilmic (наиболее близкое стандартное)
+              gl.toneMappingExposure = 1.0 // Exposure 0.0 в Blender ≈ 1.0 здесь
+            }}
+          >
             <PerspectiveCamera makeDefault position={[0, 0, 5]} />
-            <ambientLight intensity={0.5} />
-            <directionalLight position={[5, 5, 5]} intensity={1} />
-            <pointLight position={[-5, -5, -5]} intensity={0.5} />
+            {/* World Strength в Blender = 1.0 → примерно соответствует ambientLight intensity={1.0} */}
+            <ambientLight intensity={1.0} />
+            {/* Нейтральный ключевой свет */}
+            <directionalLight position={[5, 5, 5]} intensity={1.0} />
+            {/* Лёгкий заполняющий свет */}
+            <pointLight position={[-3, 2, -3]} intensity={0.25} />
             
             <Suspense fallback={null}>
               <Granule3DWithModel 
                 hoverRotation={hoveredNutrient ? (HOVER_ROTATION_ANGLE * Math.PI) / 180 : 0}
                 modelPath="/models/granule-organic.glb"
+                initialPosition={[0, 0, 0]}
+                initialRotation={[-Math.PI / 2, Math.PI, 0]}
+                initialScale={1}
               />
             </Suspense>
             
             <OrbitControls 
-              enableZoom={true}
+              enableZoom={false}
               enablePan={false}
-              minDistance={3}
-              maxDistance={8}
+              
+              minDistance={3.7}
+              maxDistance={3.7}
+              
             />
           </Canvas>
         </div>
@@ -98,403 +179,27 @@ export const FertilizerGranule = () => {
           hoveredNutrient={hoveredNutrient}
         />
         
-        {/* Описание при наведении на Азот */}
-        {hoveredNutrient === 'nitrogen' && (
-          <div
-            className="nutrient-description"
-            style={{
-              position: 'absolute',
-              top: '63px',
-              left: '15px',
-              width: '320px',
-              height: '50px',
-              opacity: 1,
-              transform: 'rotate(0deg)',
-              pointerEvents: 'none',
-              zIndex: 20,
-              animation: 'fadeInOnly 0.3s ease'
-            }}
-          >
-            {NUTRIENTS.find(n => n.id === 'nitrogen')?.description}
-          </div>
-        )}
-        
-        {/* Описание при наведении на Магний */}
-        {hoveredNutrient === 'magnesium' && (
-          <div
-            className="nutrient-description"
-            style={{
-              position: 'absolute',
-              top: '69px',
-              right: '105px',
-              width: '293px',
-              height: '50px',
-              opacity: 1,
-              transform: 'rotate(0deg)',
-              pointerEvents: 'none',
-              zIndex: 20,
-              animation: 'fadeInOnly 0.3s ease'
-            }}
-          >
-            {NUTRIENTS.find(n => n.id === 'magnesium')?.description}
-          </div>
-        )}
-        
-        {/* Описание при наведении на Фосфор */}
-        {hoveredNutrient === 'phosphorus' && (
-          <div
-            className="nutrient-description"
-            style={{
-              position: 'absolute',
-              top: '344.96px',
-              left: '149.75px',
-              width: '297px',
-              height: '50px',
-              opacity: 1,
-              transform: 'rotate(0deg)',
-              pointerEvents: 'none',
-              zIndex: 20,
-              animation: 'fadeInOnly 0.3s ease'
-            }}
-          >
-            {NUTRIENTS.find(n => n.id === 'phosphorus')?.description}
-          </div>
-        )}
-        
-        {/* Описание при наведении на Калий */}
-        {hoveredNutrient === 'potassium' && (
-          <div
-            className="nutrient-description"
-            style={{
-              position: 'absolute',
-              top: '476.96px',
-              left: '49.75px',
-              width: '289px',
-              height: '30px',
-              opacity: 1,
-              transform: 'rotate(0deg)',
-              pointerEvents: 'none',
-              zIndex: 20,
-              animation: 'fadeInOnly 0.3s ease'
-            }}
-          >
-            {NUTRIENTS.find(n => n.id === 'potassium')?.description}
-          </div>
-        )}
-        
-        {/* Описание при наведении на Кальций */}
-        {hoveredNutrient === 'calcium' && (
-          <div
-            className="nutrient-description"
-            style={{
-              position: 'absolute',
-              top: '451.96px',
-              left: '920.75px',
-              width: '289px',
-              height: '50px',
-              opacity: 1,
-              transform: 'rotate(0deg)',
-              pointerEvents: 'none',
-              zIndex: 20,
-              animation: 'fadeInOnly 0.3s ease'
-            }}
-          >
-            {NUTRIENTS.find(n => n.id === 'calcium')?.description}
-          </div>
-        )}
-        
-        {/* Описание при наведении на Серу */}
-        {hoveredNutrient === 'sulfur' && (
-          <div
-            className="nutrient-description"
-            style={{
-              position: 'absolute',
-              top: '284.96px',
-              left: '1000.75px',
-              width: '289px',
-              height: '50px',
-              opacity: 1,
-              transform: 'rotate(0deg)',
-              pointerEvents: 'none',
-              zIndex: 20,
-              animation: 'fadeInOnly 0.3s ease'
-            }}
-          >
-            {NUTRIENTS.find(n => n.id === 'sulfur')?.description}
-          </div>
-        )}
-        
-        {/* SVG формула на 3D модели при наведении на Фосфор */}
-        {hoveredNutrient === 'phosphorus' && (
-          <div
-            style={{
-              position: 'absolute',
-              top: '278.96px',
-              left: '507.75px',
-              width: '98px',
-              height: '100px',
-              opacity: 1,
-              transform: 'rotate(0deg)',
-              borderRadius: '100px',
-              border: '1px solid transparent',
-              pointerEvents: 'none',
-              zIndex: 1,
-              animation: 'fadeInScale 0.3s ease'
-            }}
-          >
-            <svg width="98" height="100" viewBox="0 0 98 100" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <foreignObject x="-7.4" y="-7.4" width="112.8" height="114.8">
-                <div style={{backdropFilter: 'blur(3.7px)', clipPath: 'url(#bgblur_0_2585_14991_clip_path)', height: '100%', width: '100%'}}></div>
-              </foreignObject>
-              <g data-figma-bg-blur-radius="7.4">
-                <rect width="98" height="100" rx="49" fill="white" fillOpacity="0.33"/>
-                <rect x="0.5" y="0.5" width="97" height="99" rx="48.5" stroke="url(#paint0_linear_2585_14991)" strokeOpacity="0.2"/>
-                <path d="M22.0013 59.7864L22 37.3864L31.216 37.3859C33.456 37.3858 35.312 37.951 36.7841 39.0816C38.2562 40.2121 38.9923 41.9508 38.9924 44.2974C38.9925 46.6441 38.278 48.3615 36.8487 49.4496C35.4194 50.5163 33.5741 51.0497 31.3128 51.0499L25.5848 51.0502L25.5853 59.7862L22.0013 59.7864ZM25.5846 48.2982L30.8006 48.2979C32.23 48.2978 33.3499 47.9671 34.1606 47.3057C34.9925 46.6443 35.4085 45.6416 35.4084 44.2976C35.4083 42.975 34.9923 41.983 34.1602 41.3217C33.3495 40.6604 32.2295 40.3298 30.8002 40.3299L25.5842 40.3302L25.5846 48.2982Z" fill="#1A1F23"/>
-                <path d="M44.3811 61.3851L51.2931 61.3847L51.2933 63.5927L40.7653 63.5933L40.7652 61.5773L45.3089 57.4491C46.0555 56.7877 46.5782 56.3077 46.8768 56.009C47.1755 55.7103 47.4741 55.3263 47.7728 54.8569C48.0714 54.3662 48.2207 53.8969 48.2207 53.4489C48.2206 52.8729 48.0286 52.4249 47.6446 52.1049C47.2819 51.785 46.8019 51.625 46.2046 51.625C44.7326 51.6251 43.9113 52.6065 43.7407 54.5692L41.1167 54.3773C41.2446 52.7133 41.7672 51.4759 42.6845 50.6652C43.6018 49.8332 44.7751 49.4171 46.2044 49.417C47.5698 49.4169 48.6898 49.7689 49.5645 50.4728C50.4605 51.1554 50.9086 52.1474 50.9087 53.4487C50.9087 54.2594 50.6848 55.0274 50.2368 55.7528C49.7889 56.4781 48.9889 57.3422 47.837 58.3449L44.3811 61.3851Z" fill="#1A1F23"/>
-                <path d="M56.1279 57.0004C54.3571 54.8885 53.4716 52.0833 53.4714 48.5846C53.4712 45.0859 54.3564 42.2805 56.1269 40.1684C57.9188 38.0563 60.4574 37.0002 63.7427 37C67.0281 36.9998 69.5561 38.0557 71.3269 40.1676C73.119 42.2795 74.0152 45.0847 74.0154 48.5834C74.0156 52.0821 73.1198 54.8875 71.3279 56.9996C69.5573 59.1117 67.0294 60.1678 63.7441 60.168C60.4587 60.1682 57.92 59.1123 56.1279 57.0004ZM58.815 42.3443C57.6418 43.9444 57.0552 46.0244 57.0554 48.5844C57.0555 51.1444 57.6423 53.235 58.8158 54.8563C59.9892 56.4562 61.6319 57.2561 63.7439 57.256C65.8559 57.2559 67.4985 56.4558 68.6718 54.8557C69.845 53.2343 70.4315 51.1436 70.4314 48.5836C70.4313 46.0236 69.8445 43.9436 68.671 42.3437C67.4976 40.7224 65.8549 39.9119 63.7429 39.912C61.6309 39.9121 59.9883 40.7229 58.815 42.3443Z" fill="#1A1F23"/>
-                <path d="M82.673 54.5349C84.1023 54.5348 85.2437 54.9081 86.0971 55.6547C86.9718 56.38 87.4092 57.4573 87.4092 58.8866C87.4093 60.444 86.8974 61.6387 85.8735 62.4707C84.8495 63.3028 83.5162 63.7189 81.8735 63.719C80.4015 63.719 79.1535 63.3778 78.1295 62.6952C77.1054 62.0126 76.4974 61.0313 76.3053 59.7513L78.9293 59.5591C79.0787 60.2204 79.42 60.7111 79.9534 61.0311C80.5081 61.3724 81.1481 61.543 81.8734 61.5429C82.7267 61.5429 83.4094 61.3082 83.9214 60.8388C84.4547 60.3695 84.7213 59.7188 84.7212 58.8868C84.7212 58.0335 84.4545 57.3828 83.9211 56.9348C83.3878 56.4869 82.6944 56.2629 81.8411 56.263C80.5824 56.263 79.6651 56.6897 79.0892 57.5431L76.6892 57.3512L77.2967 49.7032L86.5767 49.7027L86.5768 51.8787L79.3128 51.8791L78.9931 55.7511C79.8677 54.9404 81.0943 54.535 82.673 54.5349Z" fill="#1A1F23"/>
-              </g>
-              <defs>
-                <clipPath id="bgblur_0_2585_14991_clip_path" transform="translate(7.4 7.4)">
-                  <rect width="98" height="100" rx="49"/>
-                </clipPath>
-                <linearGradient id="paint0_linear_2585_14991" x1="25.4071" y1="7.26356e-07" x2="76.6067" y2="96.6824" gradientUnits="userSpaceOnUse">
-                  <stop stopColor="white"/>
-                  <stop offset="1" stopColor="white" stopOpacity="0.2"/>
-                </linearGradient>
-              </defs>
-            </svg>
-          </div>
-        )}
-        
-        {/* SVG формула на 3D модели при наведении на Магний */}
-        {hoveredNutrient === 'magnesium' && (
-          <div
-            style={{
-              position: 'absolute',
-              top: '95px',
-              left: '660px',
-              width: '98px',
-              height: '100px',
-              opacity: 1,
-              transform: 'rotate(0deg)',
-              borderRadius: '100px',
-              border: '1px solid transparent',
-              pointerEvents: 'none',
-              zIndex: 1,
-              animation: 'fadeInScale 0.3s ease'
-            }}
-          >
-            <svg width="98" height="100" viewBox="0 0 98 100" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <foreignObject x="-7.4" y="-7.4" width="112.8" height="114.8">
-                <div style={{backdropFilter: 'blur(3.7px)', clipPath: 'url(#bgblur_0_2585_14961_clip_path)', height: '100%', width: '100%'}}></div>
-              </foreignObject>
-              <g data-figma-bg-blur-radius="7.4">
-                <rect width="98" height="100" rx="49" fill="white" fillOpacity="0.33"/>
-                <rect x="0.5" y="0.5" width="97" height="99" rx="48.5" stroke="url(#paint0_linear_2585_14961)" strokeOpacity="0.2"/>
-                <path d="M34.984 37.3863L41.192 37.3859L41.1933 59.7859L37.7373 59.7861L37.7361 39.4661L31.5293 59.7865L26.6653 59.7868L20.4241 39.4671L20.4253 59.7871L17.0013 59.7873L17 37.3873L23.272 37.387L29.1292 57.7386L34.984 37.3863Z" fill="#1A1F23"/>
-                <path d="M47.0146 57.1616C45.6919 55.6257 45.0304 53.5884 45.0303 51.0497C45.0301 48.5111 45.6914 46.4737 47.0139 44.9376C48.3578 43.4015 50.0751 42.6334 52.1658 42.6333C53.4031 42.6332 54.5018 42.9318 55.4619 43.5291C56.4432 44.1264 57.2113 44.9583 57.766 46.025L57.7658 43.017L60.9338 43.0168L60.9347 58.2808C60.9349 61.1395 60.3163 63.2302 59.0791 64.5529C57.8418 65.897 55.9005 66.5691 53.2552 66.5692C51.0792 66.5694 49.3512 66.1001 48.0711 65.1615C46.8124 64.2443 46.151 62.8577 46.0869 61.0017L49.2549 61.0015C49.3189 61.9615 49.6923 62.6974 50.375 63.2094C51.079 63.7214 52.039 63.9773 53.255 63.9772C54.7697 63.9772 55.8577 63.5718 56.519 62.7611C57.1803 61.9717 57.5109 60.7663 57.5108 59.145L57.5106 56.489C56.3587 58.4731 54.5881 59.4652 52.1988 59.4653C50.0868 59.4654 48.3587 58.6975 47.0146 57.1616ZM48.4223 51.1455C48.4224 52.8735 48.8491 54.2602 49.7025 55.3054C50.5559 56.3507 51.6866 56.8733 53.0946 56.8733C54.524 56.8732 55.6653 56.3504 56.5185 55.3051C57.3718 54.2597 57.7984 52.873 57.7983 51.145C57.7982 49.3956 57.3714 47.9877 56.5181 46.9211C55.6647 45.8544 54.5233 45.3212 53.094 45.3212C51.686 45.3213 50.5553 45.8547 49.7021 46.9214C48.8488 47.9882 48.4222 49.3962 48.4223 51.1455Z" fill="#1A1F23"/>
-                <path d="M67.0654 57.0004C65.2946 54.8885 64.4091 52.0833 64.4089 48.5846C64.4087 45.0859 65.2939 42.2805 67.0644 40.1684C68.8563 38.0563 71.3949 37.0002 74.6802 37C77.9656 36.9998 80.4936 38.0557 82.2644 40.1676C84.0565 42.2795 84.9527 45.0847 84.9529 48.5834C84.9531 52.0821 84.0573 54.8875 82.2654 56.9996C80.4948 59.1117 77.9669 60.1678 74.6816 60.168C71.3962 60.1682 68.8575 59.1123 67.0654 57.0004ZM69.7525 42.3443C68.5793 43.9444 67.9927 46.0244 67.9929 48.5844C67.993 51.1444 68.5798 53.235 69.7533 54.8563C70.9267 56.4562 72.5694 57.2561 74.6814 57.256C76.7934 57.2559 78.436 56.4558 79.6093 54.8557C80.7825 53.2343 81.369 51.1436 81.3689 48.5836C81.3688 46.0236 80.782 43.9436 79.6085 42.3437C78.4351 40.7224 76.7924 39.9119 74.6804 39.912C72.5684 39.9121 70.9258 40.7229 69.7525 42.3443Z" fill="#1A1F23"/>
-              </g>
-              <defs>
-                <clipPath id="bgblur_0_2585_14961_clip_path" transform="translate(7.4 7.4)">
-                  <rect width="98" height="100" rx="49"/>
-                </clipPath>
-                <linearGradient id="paint0_linear_2585_14961" x1="25.4071" y1="7.26356e-07" x2="76.6067" y2="96.6824" gradientUnits="userSpaceOnUse">
-                  <stop stopColor="white"/>
-                  <stop offset="1" stopColor="white" stopOpacity="0.2"/>
-                </linearGradient>
-              </defs>
-            </svg>
-          </div>
-        )}
-        
-        {/* SVG формула на 3D модели при наведении на Калий */}
-        {hoveredNutrient === 'potassium' && (
-          <div
-            style={{
-              position: 'absolute',
-              top: '328.96px',
-              left: '601.75px',
-              width: '98px',
-              height: '100px',
-              opacity: 1,
-              transform: 'rotate(0deg)',
-              borderRadius: '100px',
-              border: '1px solid transparent',
-              pointerEvents: 'none',
-              zIndex: 1,
-              animation: 'fadeInScale 0.3s ease'
-            }}
-          >
-            <svg width="98" height="100" viewBox="0 0 98 100" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <foreignObject x="-7.4" y="-7.4" width="112.8" height="114.8">
-                <div style={{backdropFilter: 'blur(3.7px)', clipPath: 'url(#bgblur_0_2585_15021_clip_path)', height: '100%', width: '100%'}}></div>
-              </foreignObject>
-              <g data-figma-bg-blur-radius="7.4">
-                <rect width="98" height="100" rx="49" fill="white" fillOpacity="0.33"/>
-                <rect x="0.5" y="0.5" width="97" height="99" rx="48.5" stroke="url(#paint0_linear_2585_15021)" strokeOpacity="0.2"/>
-                <path d="M43.4973 59.7854L39.2413 59.7856L31.6247 49.8661L28.5847 49.8663L28.5853 59.7863L25.0013 59.7865L25 37.3865L28.584 37.3863L28.5846 47.0823L31.5926 47.0821L38.664 37.3857L42.824 37.3854L34.3766 48.2339L43.4973 59.7854Z" fill="#1A1F23"/>
-                <path d="M48.2874 61.3851L55.1994 61.3847L55.1995 63.5927L44.6715 63.5933L44.6714 61.5773L49.2152 57.4491C49.9618 56.7877 50.4844 56.3077 50.7831 56.009C51.0817 55.7103 51.3804 55.3263 51.679 54.8569C51.9776 54.3662 52.127 53.8969 52.1269 53.4489C52.1269 52.8729 51.9349 52.4249 51.5509 52.1049C51.1882 51.785 50.7082 51.625 50.1108 51.625C48.6388 51.6251 47.8175 52.6065 47.647 54.5692L45.023 54.3773C45.1509 52.7133 45.6735 51.4759 46.5908 50.6652C47.5081 49.8332 48.6814 49.4171 50.1107 49.417C51.476 49.4169 52.5961 49.7689 53.4708 50.4728C54.3668 51.1554 54.8149 52.1474 54.8149 53.4487C54.815 54.2594 54.591 55.0274 54.1431 55.7528C53.6951 56.4781 52.8952 57.3422 51.7432 58.3449L48.2874 61.3851Z" fill="#1A1F23"/>
-                <path d="M60.0341 57.0004C58.2633 54.8885 57.3778 52.0833 57.3776 48.5846C57.3774 45.0859 58.2626 42.2805 60.0332 40.1684C61.825 38.0563 64.3636 37.0002 67.649 37C70.9343 36.9998 73.4624 38.0557 75.2332 40.1676C77.0253 42.2795 77.9214 45.0847 77.9216 48.5834C77.9219 52.0821 77.026 54.8875 75.2341 56.9996C73.4636 59.1117 70.9357 60.1678 67.6503 60.168C64.365 60.1682 61.8263 59.1123 60.0341 57.0004ZM62.7213 42.3443C61.548 43.9444 60.9615 46.0244 60.9616 48.5844C60.9618 51.1444 61.5486 53.235 62.722 54.8563C63.8954 56.4562 65.5382 57.2561 67.6502 57.256C69.7621 57.2559 71.4048 56.4558 72.578 54.8557C73.7513 53.2343 74.3378 51.1436 74.3377 48.5836C74.3375 46.0236 73.7507 43.9436 72.5773 42.3437C71.4039 40.7224 69.7611 39.9119 67.6491 39.912C65.5371 39.9121 63.8945 40.7229 62.7213 42.3443Z" fill="#1A1F23"/>
-              </g>
-              <defs>
-                <clipPath id="bgblur_0_2585_15021_clip_path" transform="translate(7.4 7.4)">
-                  <rect width="98" height="100" rx="49"/>
-                </clipPath>
-                <linearGradient id="paint0_linear_2585_15021" x1="25.4071" y1="7.26356e-07" x2="76.6067" y2="96.6824" gradientUnits="userSpaceOnUse">
-                  <stop stopColor="white"/>
-                  <stop offset="1" stopColor="white" stopOpacity="0.2"/>
-                </linearGradient>
-              </defs>
-            </svg>
-          </div>
-        )}
-        
-        {/* SVG формула на 3D модели при наведении на Азот */}
-        {hoveredNutrient === 'nitrogen' && (
-          <div
-            style={{
-              position: 'absolute',
-              top: '117.96px',
-              left: '521.75px',
-              width: '164px',
-              height: '109px',
-              opacity: 1,
-              transform: 'rotate(0deg)',
-              borderRadius: '100px',
-              border: '1px solid transparent',
-              pointerEvents: 'none',
-              zIndex: 1,
-              animation: 'fadeInScale 0.3s ease'
-            }}
-          >
-            <svg width="164" height="109" viewBox="0 0 164 109" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <foreignObject x="-7.4" y="-7.4" width="112.8" height="114.8">
-                <div style={{backdropFilter: 'blur(3.7px)', clipPath: 'url(#bgblur_0_2585_14930_clip_path)', height: '100%', width: '100%'}}></div>
-              </foreignObject>
-              <g data-figma-bg-blur-radius="7.4">
-                <rect width="98" height="100" rx="49" fill="white" fillOpacity="0.33"/>
-                <rect x="0.5" y="0.5" width="97" height="99" rx="48.5" stroke="url(#paint0_linear_2585_14930)" strokeOpacity="0.2"/>
-                <path d="M30.8099 38.825L34.0996 38.8248L34.1009 60.7846L28.3209 60.785L19.742 40.9589L19.7431 60.7855L16.4534 60.7857L16.4521 38.8258L22.2322 38.8255L30.8111 58.6516L30.8099 38.825Z" fill="#1A1F23"/>
-                <path d="M52.9855 38.8236L56.4289 38.8234L56.4302 60.7833L52.9868 60.7835L52.9862 51.0584L42.5945 51.059L42.5951 60.7841L39.1516 60.7843L39.1504 38.8245L42.5938 38.8243L42.5943 48.1729L52.986 48.1723L52.9855 38.8236Z" fill="#1A1F23"/>
-                <path d="M69.4839 59.3395L71.7282 59.3393L71.7283 61.4726L69.484 61.4727L69.4841 64.4216L66.8709 64.4218L66.8707 61.4729L59.5842 61.4733L59.5841 59.4969L65.2406 50.9009L69.4834 50.9006L69.4839 59.3395ZM62.1051 59.3399L66.8706 59.3396L66.8702 52.2183L62.1051 59.3399Z" fill="#1A1F23"/>
-                <path d="M76.8136 46.4768L76.8134 43.026L73.5545 43.0262L73.5543 41.0812L76.8133 41.081L76.8131 37.5988L78.9345 37.5986L78.9347 41.0808L82.1936 41.0806L82.1937 43.0257L78.9348 43.0259L78.935 46.4767L76.8136 46.4768Z" fill="#1A1F23"/>
-              </g>
-              <foreignObject x="76.6" y="21.6" width="94.8" height="94.8">
-                <div style={{backdropFilter: 'blur(3.7px)', clipPath: 'url(#bgblur_1_2585_14930_clip_path)', height: '100%', width: '100%'}}></div>
-              </foreignObject>
-              <g data-figma-bg-blur-radius="7.4">
-                <rect x="84" y="29" width="80" height="80" rx="40" fill="white" fillOpacity="0.33"/>
-                <rect x="84.5" y="29.5" width="79" height="79" rx="39.5" stroke="url(#paint1_linear_2585_14930)" strokeOpacity="0.2"/>
-                <path d="M110.84 60.8037L113.376 60.8036L113.377 77.3956L108.921 77.3958L102.307 62.416L102.308 77.3962L99.7715 77.3964L99.7705 60.8044L104.227 60.8041L110.841 75.7839L110.84 60.8037Z" fill="#1A1F23"/>
-                <path d="M118.314 75.3331C117.002 73.7688 116.346 71.6909 116.346 69.0994C116.346 66.5079 117.002 64.4299 118.313 62.8655C119.641 61.301 121.521 60.5187 123.955 60.5186C126.388 60.5184 128.261 61.3005 129.572 62.8648C130.9 64.4291 131.564 66.507 131.564 69.0985C131.564 71.69 130.901 73.768 129.573 75.3325C128.262 76.8969 126.389 77.6792 123.956 77.6794C121.522 77.6795 119.642 76.8974 118.314 75.3331ZM120.305 64.4771C119.435 65.6623 119.001 67.203 119.001 69.0993C119.001 70.9955 119.436 72.544 120.305 73.7449C121.174 74.93 122.391 75.5225 123.956 75.5224C125.52 75.5223 126.737 74.9297 127.606 73.7445C128.475 72.5435 128.909 70.9949 128.909 69.0987C128.909 67.2025 128.474 65.6618 127.605 64.4767C126.736 63.2758 125.519 62.6754 123.955 62.6755C122.39 62.6756 121.174 63.2761 120.305 64.4771Z" fill="#1A1F23"/>
-                <path d="M139.707 74.4549C140.576 74.9605 141.011 75.7901 141.011 76.9436C141.011 78.0497 140.624 78.8873 139.85 79.4562C139.076 80.0251 138.088 80.3096 136.887 80.3096C135.749 80.3097 134.817 80.0411 134.09 79.5039C133.379 78.9825 132.968 78.1924 132.857 77.1337L134.801 77.0151C134.959 78.137 135.654 78.6979 136.887 78.6979C137.535 78.6978 138.048 78.5398 138.428 78.2237C138.807 77.9235 138.996 77.4968 138.996 76.9437C138.996 76.4381 138.822 76.0351 138.475 75.7349C138.127 75.4189 137.606 75.2609 136.91 75.2609C136.405 75.261 135.867 75.3163 135.299 75.427L135.298 74.0759L138.143 71.5395L133.402 71.5398L133.402 69.928L140.703 69.9276L140.703 71.3735L137.479 73.9099C138.364 73.9414 139.107 74.1231 139.707 74.4549Z" fill="#1A1F23"/>
-                <path d="M142.591 63.9781L142.591 62.5085L149.252 62.5081L149.252 63.9777L142.591 63.9781Z" fill="#1A1F23"/>
-              </g>
-              <defs>
-                <clipPath id="bgblur_0_2585_14930_clip_path" transform="translate(7.4 7.4)">
-                  <rect width="98" height="100" rx="49"/>
-                </clipPath>
-                <clipPath id="bgblur_1_2585_14930_clip_path" transform="translate(-76.6 -21.6)">
-                  <rect x="84" y="29" width="80" height="80" rx="40"/>
-                </clipPath>
-                <linearGradient id="paint0_linear_2585_14930" x1="25.4071" y1="7.26356e-07" x2="76.6067" y2="96.6824" gradientUnits="userSpaceOnUse">
-                  <stop stopColor="white"/>
-                  <stop offset="1" stopColor="white" stopOpacity="0.2"/>
-                </linearGradient>
-                <linearGradient id="paint1_linear_2585_14930" x1="104.74" y1="29" x2="145.232" y2="107.023" gradientUnits="userSpaceOnUse">
-                  <stop stopColor="white"/>
-                  <stop offset="1" stopColor="white" stopOpacity="0.2"/>
-                </linearGradient>
-              </defs>
-            </svg>
-          </div>
-        )}
-        
-        {/* SVG формула на 3D модели при наведении на Кальций */}
-        {hoveredNutrient === 'calcium' && (
-          <div
-            style={{
-              position: 'absolute',
-              top: '298px',
-              left: '679px',
-              width: '98px',
-              height: '100px',
-              opacity: 1,
-              transform: 'rotate(0deg)',
-              borderRadius: '100px',
-              border: '1px solid transparent',
-              pointerEvents: 'none',
-              zIndex: 1,
-              animation: 'fadeInScale 0.3s ease'
-            }}
-          >
-            <svg width="98" height="100" viewBox="0 0 98 100" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <foreignObject x="-7.4" y="-7.4" width="112.8" height="114.8">
-                <div style={{backdropFilter: 'blur(3.7px)', clipPath: 'url(#bgblur_0_2585_15051_clip_path)', height: '100%', width: '100%'}}></div>
-              </foreignObject>
-              <g data-figma-bg-blur-radius="7.4">
-                <rect width="98" height="100" rx="49" fill="white" fillOpacity="0.33"/>
-                <rect x="0.5" y="0.5" width="97" height="99" rx="48.5" stroke="url(#paint0_linear_2585_15051)" strokeOpacity="0.2"/>
-                <path d="M31 49.5846C30.9998 46.1072 31.8636 43.3125 33.5915 41.2004C35.3194 39.067 37.7407 38.0002 40.8553 38C43.4153 37.9999 45.506 38.6824 47.1274 40.0476C48.7489 41.3915 49.709 43.2155 50.0078 45.5195L46.6158 45.8077C46.4024 44.3357 45.7623 43.1517 44.6956 42.2558C43.6502 41.3598 42.3702 40.9119 40.8555 40.912C38.8075 40.9121 37.2502 41.7442 36.1836 43.4083C35.1171 45.0723 34.5839 47.131 34.584 49.5844C34.5841 52.1017 35.1603 54.1817 36.3124 55.8243C37.4645 57.4455 39.0645 58.2561 41.1125 58.256C42.7338 58.2559 44.0458 57.7652 45.0484 56.7838C46.051 55.781 46.6483 54.5223 46.8402 53.0077L50.2642 53.2315C49.9657 55.6635 49.0271 57.5942 47.4485 59.0236C45.8913 60.453 43.7793 61.1678 41.1127 61.168C37.8913 61.1682 35.3953 60.123 33.6245 58.0324C31.875 55.9205 31.0002 53.1046 31 49.5846Z" fill="#1A1F23"/>
-                <path d="M52.5294 56.3353C52.5292 53.2633 54.7798 51.5139 59.2811 51.0869L64.0171 50.6387L64.017 49.3587C64.0169 48.3773 63.7076 47.588 63.0888 46.9907C62.4915 46.3934 61.5848 46.0948 60.3688 46.0949C59.2808 46.0949 58.3848 46.351 57.6808 46.863C56.9769 47.3537 56.5929 48.0791 56.529 49.0391L53.393 49.0393C53.4569 47.1833 54.1288 45.8179 55.4087 44.9432C56.6887 44.0684 58.342 43.631 60.3687 43.6309C62.6513 43.6307 64.4007 44.1746 65.6167 45.2626C66.8328 46.3505 67.4409 47.9505 67.441 50.0625L67.4417 60.7825L64.2736 60.7826L64.2735 57.5186C63.7402 58.6707 62.9402 59.5667 61.8736 60.2068C60.807 60.8468 59.5163 61.1669 58.0017 61.167C56.1883 61.1671 54.823 60.7192 53.9056 59.8232C52.9882 58.9273 52.5295 57.7647 52.5294 56.3353ZM55.9214 56.1751C55.9214 56.9431 56.1775 57.5724 56.6895 58.0631C57.2229 58.5324 58.0122 58.767 59.0575 58.7669C60.5722 58.7669 61.7775 58.2975 62.6735 57.3587C63.5694 56.3987 64.0173 55.172 64.0172 53.6787L64.0172 52.7827L59.7292 53.1989C57.1906 53.4551 55.9213 54.4471 55.9214 56.1751Z" fill="#1A1F23"/>
-              </g>
-              <defs>
-                <clipPath id="bgblur_0_2585_15051_clip_path" transform="translate(7.4 7.4)">
-                  <rect width="98" height="100" rx="49"/>
-                </clipPath>
-                <linearGradient id="paint0_linear_2585_15051" x1="25.4071" y1="7.26356e-07" x2="76.6067" y2="96.6824" gradientUnits="userSpaceOnUse">
-                  <stop stopColor="white"/>
-                  <stop offset="1" stopColor="white" stopOpacity="0.2"/>
-                </linearGradient>
-              </defs>
-            </svg>
-          </div>
-        )}
-        
-        {/* SVG формула на 3D модели при наведении на Серу */}
-        {hoveredNutrient === 'sulfur' && (
-          <div
-            style={{
-              position: 'absolute',
-              top: '197.96px',
-              left: '755.75px',
-              width: '98px',
-              height: '100px',
-              opacity: 1,
-              transform: 'rotate(0deg)',
-              borderRadius: '100px',
-              border: '1px solid transparent',
-              pointerEvents: 'none',
-              zIndex: 1,
-              animation: 'fadeInScale 0.3s ease'
-            }}
-          >
-            <svg width="98" height="100" viewBox="0 0 98 100" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <foreignObject x="-7.4" y="-7.4" width="112.8" height="114.8">
-                <div style={{backdropFilter: 'blur(3.7px)', clipPath: 'url(#bgblur_0_2585_15082_clip_path)', height: '100%', width: '100%'}}></div>
-              </foreignObject>
-              <g data-figma-bg-blur-radius="7.4">
-                <rect width="98" height="100" rx="49" fill="white" fillOpacity="0.33"/>
-                <rect x="0.5" y="0.5" width="97" height="99" rx="48.5" stroke="url(#paint0_linear_2585_15082)" strokeOpacity="0.2"/>
-                <path d="M22.4922 51.9626L25.8522 51.8344C26.0017 54.9917 27.9005 56.5702 31.5485 56.57C32.9778 56.57 34.1618 56.3032 35.1004 55.7698C36.039 55.2364 36.5083 54.3938 36.5083 53.2418C36.5082 52.4311 36.2202 51.7698 35.6441 51.2578C35.0681 50.7245 34.0974 50.2339 32.7321 49.786L28.092 48.2822C24.8919 47.2584 23.2918 45.2958 23.2916 42.3945C23.2915 40.3465 24.0168 38.8105 25.4674 37.7864C26.9393 36.741 28.7846 36.2182 31.0033 36.2181C33.3926 36.2179 35.3446 36.8152 36.8594 38.0097C38.3954 39.183 39.2382 40.8256 39.3877 42.9376L36.0597 43.1618C35.9743 41.9031 35.4942 40.9005 34.6195 40.1539C33.7661 39.4072 32.5501 39.034 30.9714 39.0341C29.6701 39.0341 28.6568 39.3115 27.9315 39.8662C27.2275 40.3996 26.8756 41.157 26.8756 42.1383C26.8757 43.653 27.9744 44.7622 30.1718 45.4661L34.8119 46.9378C36.5826 47.4924 37.9053 48.2497 38.78 49.2096C39.6548 50.1696 40.0922 51.4282 40.0922 52.9855C40.0924 55.1189 39.3245 56.7189 37.7885 57.7857C36.2526 58.8524 34.162 59.3859 31.5166 59.386C28.6793 59.3862 26.4926 58.757 24.9565 57.4984C23.4204 56.2185 22.599 54.3732 22.4922 51.9626Z" fill="#1A1F23"/>
-                <path d="M45.3449 56.2172C43.5741 54.1053 42.6886 51.3001 42.6884 47.8014C42.6882 44.3027 43.5734 41.4973 45.344 39.3852C47.1358 37.2731 49.6744 36.217 52.9598 36.2168C56.2451 36.2166 58.7732 37.2725 60.544 39.3844C62.3361 41.4963 63.2322 44.3015 63.2324 47.8002C63.2327 51.2989 62.3368 54.1043 60.5449 56.2164C58.7744 58.3285 56.2465 59.3846 52.9611 59.3848C49.6758 59.385 47.1371 58.3291 45.3449 56.2172ZM48.0321 41.5611C46.8588 43.1611 46.2723 45.2412 46.2724 47.8012C46.2726 50.3612 46.8594 52.4518 48.0328 54.0731C49.2062 55.673 50.8489 56.4729 52.9609 56.4728C55.0729 56.4727 56.7156 55.6726 57.8888 54.0725C59.062 52.4511 59.6486 50.3604 59.6484 47.8004C59.6483 45.2404 59.0615 43.1604 57.8881 41.5605C56.7147 39.9392 55.0719 39.1287 52.9599 39.1288C50.8479 39.1289 49.2053 39.9397 48.0321 41.5611Z" fill="#1A1F23"/>
-                <path d="M74.2261 55.0316C75.3995 55.7142 75.9862 56.8341 75.9863 58.3915C75.9864 59.8848 75.4638 61.0155 74.4185 61.7836C73.3732 62.5516 72.0399 62.9357 70.4186 62.9358C68.8826 62.9359 67.6239 62.5733 66.6425 61.848C65.6825 61.1441 65.1277 60.0774 64.9783 58.6481L67.6023 58.4879C67.8157 60.0026 68.7544 60.7599 70.4184 60.7598C71.2931 60.7597 71.9864 60.5464 72.4984 60.1197C73.0104 59.7143 73.2664 59.1383 73.2663 58.3916C73.2663 57.709 73.0316 57.165 72.5622 56.7597C72.0929 56.333 71.3888 56.1197 70.4502 56.1198C69.7675 56.1198 69.0422 56.1945 68.2742 56.3439L68.2741 54.5199L72.1139 51.0957L65.7139 51.0961L65.7138 48.9201L75.5698 48.9195L75.5699 50.8715L71.2181 54.2957C72.4127 54.3383 73.4154 54.5836 74.2261 55.0316Z" fill="#1A1F23"/>
-              </g>
-              <defs>
-                <clipPath id="bgblur_0_2585_15082_clip_path" transform="translate(7.4 7.4)">
-                  <rect width="98" height="100" rx="49"/>
-                </clipPath>
-                <linearGradient id="paint0_linear_2585_15082" x1="25.4071" y1="7.26356e-07" x2="76.6067" y2="96.6824" gradientUnits="userSpaceOnUse">
-                  <stop stopColor="white"/>
-                  <stop offset="1" stopColor="white" stopOpacity="0.2"/>
-                </linearGradient>
-              </defs>
-            </svg>
-          </div>
+        {/* Описания и формулы при наведении */}
+        {hoveredNutrientData && hoveredNutrientConfig && (
+          <>
+            {/* Описание: появляется под линией элемента при наведении */}
+            <NutrientDescription
+              description={hoveredNutrientData.description}
+              position={hoveredNutrientConfig.description}
+            />
+            
+            {/* Формула на 3D модели: появляется поверх 3D модели при наведении */}
+            {hoveredNutrientConfig.formula && hoveredNutrient && NUTRIENT_FORMULA_SVGS[hoveredNutrient] && (
+              <NutrientFormula
+                position={hoveredNutrientConfig.formula}
+                svgContent={NUTRIENT_FORMULA_SVGS[hoveredNutrient]}
+              />
+            )}
+          </>
         )}
       </div>
     </div>
   )
-}
+})
+
+FertilizerGranule.displayName = 'FertilizerGranule'
