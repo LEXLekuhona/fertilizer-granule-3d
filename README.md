@@ -143,8 +143,6 @@ newElement: {
 </script>
 ```
 
-**📖 Подробная инструкция:** [`INTEGRATION_SIMPLE.md`](./INTEGRATION_SIMPLE.md)
-
 **Шаги:**
 1. Выполните `npm run build`
 2. Скопируйте `dist/` и `public/models/` на ваш сервер
