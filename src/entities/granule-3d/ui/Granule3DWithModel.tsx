@@ -1,7 +1,7 @@
 import { useGLTF } from '@react-three/drei'
 import { useFrame, useThree } from '@react-three/fiber'
 import { useEffect, useRef } from 'react'
-import { Group, Mesh, MeshStandardMaterial, SRGBColorSpace, TextureLoader } from 'three'
+import { Group, LinearSRGBColorSpace, Mesh, MeshStandardMaterial, SRGBColorSpace, TextureLoader } from 'three'
 
 /**
  * Пропсы для компонента 3D модели гранулы
@@ -45,16 +45,15 @@ interface Granule3DWithModelProps {
  * Загружает модель заранее, чтобы избежать задержек при первом рендере.
  * Вызывается на уровне модуля, выполняется один раз при загрузке модуля.
  */
-// Используем BASE_URL для правильных путей в dev и production
-const MODELS_BASE = import.meta.env.BASE_URL + 'models/'
-useGLTF.preload(`${MODELS_BASE}granule-organic.glb`)
+// Предзагрузка модели для оптимизации
+useGLTF.preload(`${import.meta.env.BASE_URL}models/granule-organic.glb`)
 
 /**
  * Компонент для отображения 3D модели гранулы удобрения
  * 
  * ОТВЕТСТВЕННОСТЬ:
  * - Загружает и отображает GLB модель из файла
- * - Применяет SVG текстуру к материалам модели
+ * - Использует материалы и текстуры, встроенные в GLB файл
  * - Реализует плавный поворот модели при наведении на элементы питания
  * 
  * МЕХАНИЗМ ПОВОРОТА:
@@ -62,10 +61,9 @@ useGLTF.preload(`${MODELS_BASE}granule-organic.glb`)
  * - currentHoverRotation: текущий угол поворота при наведении
  * - Использует интерполяцию для плавной анимации (коэффициент 0.15)
  * 
- * ТЕКСТУРА:
- * - Загружает SVG файл (/img.svg) как текстуру
- * - Применяет ко всем Mesh объектам в модели
- * - Three.js автоматически конвертирует SVG в растровое изображение
+ * ТЕКСТУРЫ:
+ * - Используются только текстуры, встроенные в GLB файл
+ * - Настраивается правильный colorSpace (sRGB) для корректного отображения цветов
  * 
  * ОПТИМИЗАЦИЯ:
  * - Предзагрузка модели через useGLTF.preload
@@ -80,139 +78,142 @@ export const Granule3DWithModel = ({
   initialScale = 1
 }: Granule3DWithModelProps) => {
   const { scene } = useGLTF(modelPath) // Загруженная 3D сцена
-  const { gl } = useThree() // Референс на WebGL рендерер для принудительного обновления
+  const { gl } = useThree() // Референс на WebGL рендерер
   const groupRef = useRef<Group>(null) // Референс на группу объектов модели
   const baseRotation = useRef(0) // Базовый угол поворота (без учета hover)
   const currentHoverRotation = useRef(0) // Текущий угол поворота при hover
   const isInitialized = useRef(false) // Флаг инициализации базового поворота
 
   /**
-   * Применение материалов и текстур из GLB модели
+   * Настройка материалов и текстур из GLB модели
    * 
-   * ПРОБЛЕМА: Модель может быть серой, если:
-   * 1. Материалы не экспортировались из Blender
-   * 2. Текстуры не встроены в GLB или пути неправильные
-   * 3. Материалы не применяются правильно
+   * ПРИОРИТЕТ:
+   * 1. Используются текстуры, встроенные в GLB файл
+   * 2. Если в GLB нет основной цветовой текстуры (map/Albedo), загружаем из внешних файлов
    * 
-   * РЕШЕНИЕ:
-   * - Проверяем и применяем материалы из GLB
-   * - Загружаем текстуры из папки textures/ если они не встроены
-   * - Настраиваем правильные параметры материалов (colorSpace, etc.)
+   * Настраивается правильный colorSpace для корректного отображения цветов:
+   * - map (Albedo/BaseColor) - SRGBColorSpace (цветовая текстура)
+   * - normalMap, roughnessMap, aoMap - LinearSRGBColorSpace (данные, не цвета)
    */
   useEffect(() => {
     if (scene) {
       const loader = new TextureLoader()
-      
-      // Детальная проверка всех текстур в материалах из GLB
-      // ВАЖНО: Проверяем наличие основной текстуры map (Albedo), а не просто любых текстур
       let hasAlbedoTexture = false
+      let materialsCount = 0
       
+      // Сначала проверяем, есть ли основная цветовая текстура в GLB
       scene.traverse((child) => {
         if (child instanceof Mesh && child.material) {
-          const material = child.material as MeshStandardMaterial
+          const material = child.material instanceof MeshStandardMaterial 
+            ? child.material 
+            : Array.isArray(child.material) 
+              ? child.material.find(m => m instanceof MeshStandardMaterial) as MeshStandardMaterial
+              : null
           
-          // Проверяем, есть ли основная текстура Albedo (map) с нормальным размером
-          if (material.map && material.map.image && material.map.image.width > 1 && material.map.image.height > 1) {
+          if (material && material.map && material.map.image && 
+              material.map.image.width > 1 && material.map.image.height > 1) {
             hasAlbedoTexture = true
           }
         }
       })
       
-      // Если основной текстуры Albedo нет или она слишком маленькая, загружаем текстуры из папки textures/
+      // Если основной цветовой текстуры нет, загружаем из внешних файлов
       if (!hasAlbedoTexture) {
         const loadTextures = async () => {
           try {
-            // Загружаем все текстуры
-            // ВАЖНО:
-            // - BaseColor_BAKED.png — запечённый результат ColorRamp(Albedo) из Blender (sRGB)
-            // - Normal/Roughness/Occlusion — карты данных (Linear)
-            const texturesBase = MODELS_BASE + 'textures/'
+            const texturesBase = `${import.meta.env.BASE_URL}models/textures/`
+            
             const baseColorTexture = await loader.loadAsync(`${texturesBase}BaseColor_BAKED.png`)
-            baseColorTexture.colorSpace = SRGBColorSpace // sRGB для цветовой текстуры
-            baseColorTexture.flipY = false // Blender использует другую ориентацию Y
+            baseColorTexture.colorSpace = SRGBColorSpace
+            baseColorTexture.flipY = false
             
             const normalTexture = await loader.loadAsync(`${texturesBase}Normal.png`)
-            // Normal map должна быть в Linear (не sRGB)
+            normalTexture.colorSpace = LinearSRGBColorSpace
             normalTexture.flipY = false
             
             const roughnessTexture = await loader.loadAsync(`${texturesBase}Roughness.png`)
-            // Roughness map должна быть в Linear (не sRGB)
+            roughnessTexture.colorSpace = LinearSRGBColorSpace
             roughnessTexture.flipY = false
             
             const occlusionTexture = await loader.loadAsync(`${texturesBase}Occlusion.png`)
-            // Occlusion map должна быть в Linear (не sRGB)
+            occlusionTexture.colorSpace = LinearSRGBColorSpace
             occlusionTexture.flipY = false
             
-            // Применяем текстуры ко всем материалам в сцене
-            let materialsCount = 0
-            
             const applyTexturesToMaterial = (material: MeshStandardMaterial) => {
-              // Применяем текстуры
               material.map = baseColorTexture
               material.normalMap = normalTexture
               material.roughnessMap = roughnessTexture
               material.aoMap = occlusionTexture
               
-              // Включаем использование текстур
               material.normalScale.set(1, 1)
               material.aoMapIntensity = 1
-              
-              // Настраиваем параметры материала для лучшего отображения
               material.needsUpdate = true
               materialsCount++
             }
             
             scene.traverse((child) => {
-              if (child instanceof Mesh) {
-                if (child.material) {
-                  // Обрабатываем как одиночный материал, так и массив материалов
-                  if (Array.isArray(child.material)) {
-                    child.material.forEach((mat) => {
-                      if (mat instanceof MeshStandardMaterial) {
-                        applyTexturesToMaterial(mat)
-                      }
-                    })
-                  } else if (child.material instanceof MeshStandardMaterial) {
-                    applyTexturesToMaterial(child.material)
-                  }
+              if (child instanceof Mesh && child.material) {
+                if (Array.isArray(child.material)) {
+                  child.material.forEach((mat) => {
+                    if (mat instanceof MeshStandardMaterial) {
+                      applyTexturesToMaterial(mat)
+                    }
+                  })
+                } else if (child.material instanceof MeshStandardMaterial) {
+                  applyTexturesToMaterial(child.material)
                 }
               }
             })
             
-            // Принудительно обновляем рендерер
             gl.state.reset()
+            console.log(`[GLB Load] Загружены внешние текстуры для ${materialsCount} материалов`)
           } catch (error) {
-            // Ошибка загрузки текстур - модель будет использовать материалы из GLB
+            console.warn('[GLB Load] Ошибка загрузки внешних текстур:', error)
           }
         }
         
         loadTextures()
       } else {
         // Если текстуры есть в GLB, просто настраиваем colorSpace
+        const setupMaterial = (material: MeshStandardMaterial) => {
+          if (material.map) {
+            material.map.colorSpace = SRGBColorSpace
+          }
+          if (material.normalMap) {
+            material.normalMap.colorSpace = LinearSRGBColorSpace
+          }
+          if (material.roughnessMap) {
+            material.roughnessMap.colorSpace = LinearSRGBColorSpace
+          }
+          if (material.aoMap) {
+            material.aoMap.colorSpace = LinearSRGBColorSpace
+          }
+          if (material.metalnessMap) {
+            material.metalnessMap.colorSpace = LinearSRGBColorSpace
+          }
+          
+          material.needsUpdate = true
+          materialsCount++
+        }
+        
         scene.traverse((child) => {
           if (child instanceof Mesh && child.material) {
-            const material = child.material as MeshStandardMaterial
-            
-            // Настраиваем правильный colorSpace для текстур
-            if (material.map) {
-              material.map.colorSpace = SRGBColorSpace
+            if (Array.isArray(child.material)) {
+              child.material.forEach((mat) => {
+                if (mat instanceof MeshStandardMaterial) {
+                  setupMaterial(mat)
+                }
+              })
+            } else if (child.material instanceof MeshStandardMaterial) {
+              setupMaterial(child.material)
             }
-            if (material.normalMap) {
-              material.normalMap.colorSpace = SRGBColorSpace
-            }
-            if (material.roughnessMap) {
-              material.roughnessMap.colorSpace = SRGBColorSpace
-            }
-            if (material.aoMap) {
-              material.aoMap.colorSpace = SRGBColorSpace
-            }
-            
-            material.needsUpdate = true
           }
         })
+        
+        console.log(`[GLB Load] Используются текстуры из GLB для ${materialsCount} материалов`)
       }
     }
-  }, [scene])
+  }, [scene, gl])
 
   /**
    * Инициализация базового поворота при первом рендере
