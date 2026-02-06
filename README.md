@@ -135,15 +135,65 @@ newElement: {
 
 ### Вариант 2: Прямое встраивание
 
-```html
-<div id="my-fertilizer-app"></div>
-<script type="module">
-    import { initFertilizerGranule } from '/fertilizer-granule/assets/index.[hash].js';
-    initFertilizerGranule('my-fertilizer-app');
-</script>
-```
+После сборки проект предоставляет глобальную функцию `window.initFertilizerGranule()` для встраивания.
 
 **Шаги:**
-1. Выполните `npm run build`
-2. Скопируйте `dist/` и `public/models/` на ваш сервер
-3. Встройте в ваш HTML (см. примеры выше)
+
+1. **Соберите проект:**
+   ```bash
+   npm run build:deploy
+   ```
+   Эта команда создаст папку `dist/` с готовыми файлами и автоматически скопирует 3D модели.
+
+2. **Найдите имена файлов в `dist/assets/`:**
+   - CSS: `index.[hash].css` (например, `index.B6-ayNI-.css`)
+   - JS: `index.[hash].js` (например, `index.DAPXrpFb.js`)
+
+3. **Скопируйте файлы на ваш сервер:**
+   ```
+   ваш-сайт/
+   ├── granule/
+   │   ├── assets/
+   │   │   ├── index.B6-ayNI-.css
+   │   │   └── index.DAPXrpFb.js
+   │   └── models/
+   │       ├── granule-organic.glb
+   │       └── textures/
+   ```
+
+4. **Используйте в вашем HTML:**
+
+   ```html
+   <!DOCTYPE html>
+   <html lang="ru">
+   <head>
+       <meta charset="UTF-8">
+       <title>Мой сайт</title>
+       
+       <!-- Подключаем CSS -->
+       <link rel="stylesheet" href="./granule/assets/index.B6-ayNI-.css">
+   </head>
+   <body>
+       <h1>Добро пожаловать</h1>
+       
+       <!-- Контейнер для 3D приложения -->
+       <div id="my-fertilizer-app"></div>
+       
+       <p>Текст после приложения</p>
+       
+       <!-- Подключаем JS -->
+       <script src="./granule/assets/index.DAPXrpFb.js"></script>
+       
+       <!-- Инициализируем приложение -->
+       <script>
+           window.initFertilizerGranule('my-fertilizer-app');
+       </script>
+   </body>
+   </html>
+   ```
+
+**Важно:**
+- Функция `window.initFertilizerGranule` доступна глобально после загрузки JS файла
+- Замените имена файлов (`index.B6-ayNI-.css` и `index.DAPXrpFb.js`) на актуальные из вашей сборки
+- Путь к моделям (`./models/`) должен быть относительно JS файла
+- Для локального тестирования используйте файл `integration-example.html` в корне проекта

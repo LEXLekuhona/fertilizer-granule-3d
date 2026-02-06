@@ -166,9 +166,8 @@ export const Granule3DWithModel = ({
             })
             
             gl.state.reset()
-            console.log(`[GLB Load] Загружены внешние текстуры для ${materialsCount} материалов`)
           } catch (error) {
-            console.warn('[GLB Load] Ошибка загрузки внешних текстур:', error)
+            // Ошибка загрузки внешних текстур - модель будет использовать материалы из GLB
           }
         }
         
@@ -209,8 +208,6 @@ export const Granule3DWithModel = ({
             }
           }
         })
-        
-        console.log(`[GLB Load] Используются текстуры из GLB для ${materialsCount} материалов`)
       }
     }
   }, [scene, gl])

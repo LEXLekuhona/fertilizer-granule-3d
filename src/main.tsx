@@ -9,7 +9,7 @@ import './app/index.css'
  * 
  * @param containerId - ID элемента, в который будет встроено приложение (по умолчанию 'root')
  */
-export function initFertilizerGranule(containerId: string = 'root') {
+function initFertilizerGranule(containerId: string = 'root') {
   const container = document.getElementById(containerId)
   
   if (!container) {
@@ -29,6 +29,15 @@ export function initFertilizerGranule(containerId: string = 'root') {
 
   return root
 }
+
+// Экспортируем функцию глобально для встраивания в другие сайты
+declare global {
+  interface Window {
+    initFertilizerGranule: typeof initFertilizerGranule
+  }
+}
+
+window.initFertilizerGranule = initFertilizerGranule
 
 // Автоматическая инициализация, если есть элемент с id="root" (для dev режима)
 if (document.getElementById('root')) {
